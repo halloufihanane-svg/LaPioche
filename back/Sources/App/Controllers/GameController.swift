@@ -25,7 +25,7 @@ struct GameController: RouteCollection {
 
         let game = dto.toModel()
         try await game.save(on: req.db)
-        return try await game.toDTO().encodeResponse(for: req)
+        return try await game.toDTO().encodeResponse(status: .created, for: req) //pour corriger le 1er bug, ajouter le status: .created pour forcer le statut HTTP 201 Created au lieu de HTTP 200 par défaut
     }
 
     @Sendable
@@ -42,7 +42,7 @@ struct GameController: RouteCollection {
             .with(\.$loans)
             .first()
         else {
-            throw Abort(.internalServerError, reason: "Game not found")
+            throw Abort(.notFound, reason: "Game not found") //Pour le 1er bug, changer l'erreur serveur .internalServerError par une erreur cas métier : élément introuvable 404 Not Found (.notFound)
         }
         return game
     }
