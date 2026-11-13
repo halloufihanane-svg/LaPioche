@@ -3,7 +3,7 @@ import Vapor
 
 final class Loan: Model, @unchecked Sendable {
     static let schema = "loans"
-    static let durationInDays = 13
+    static let durationInDays = 14 // pour résoudre le 3ème bug : Remplacer la durée d'emprunt de 13 jours par 14 jours attendus par le test (testDueDateIsFourteenDaysAfterBorrowDate).
 
     @ID(key: .id)
     var id: UUID?
