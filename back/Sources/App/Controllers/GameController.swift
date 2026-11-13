@@ -7,6 +7,8 @@ struct GameController: RouteCollection {
         games.get(use: index)
         games.post(use: create)
         games.get(":gameID", use: show)
+        games.put(":gameID", use: update) //Pour la phase 3, déclaration de la route pour le PUT (modifier)
+        games.delete(":gameID", use: delete) //Pour la phase 3, décalration de la route pour le DELETE (supprimer)
     }
 
     @Sendable
@@ -45,5 +47,39 @@ struct GameController: RouteCollection {
             throw Abort(.notFound, reason: "Game not found") //Pour le 1er bug, changer l'erreur serveur .internalServerError par une erreur cas métier : élément introuvable 404 Not Found (.notFound)
         }
         return game
+    }
+    
+    @Sendable
+    func update(req: Request) async throws -> GameDTO { //Fonction ajouter pour la phase 3 :
+        //On retrouve le jeu grâce à l'ID dans l'URL (si l'ID n'existe pas, findGame renvoie une 404 tout seul)
+        let game = try await findGame(req) //On retrouve le jeu grâce à l'ID dans l'URL (si l'ID n'existe pas, findGame renvoie une 404 tout seul)
+        
+        try CreateGameDTO.validate(content: req)
+        let updatedDTO = try req.content.decode(CreateGameDTO.self)
+        try updatedDTO.ensureConsistentPlayerCount()
+        
+        //Ici, on met à jour les propriétés du jeu avec les nouvelles valeurs
+        game.title = updatedDTO.title
+        game.minPlayers = updatedDTO.minPlayers
+        game.maxPlayers = updatedDTO.maxPlayers
+        game.durationMinutes = updatedDTO.durationMinutes
+        
+        try await game.save(on: req.db)
+        
+        return game.toDTO()
+    }
+    
+    @Sendable
+    func delete(req: Request) async throws -> HTTPStatus { //Fonction ajouter pour la phase 3 :
+        let game = try await findGame(req)
+        
+        try await game.$loans.load(on: req.db) // ici on vérifie s'il y'a des emprunts lié au game qu'on souhaite supprimé par la suite
+            if !game.loans.isEmpty {
+                throw Abort(.badRequest, reason: "Impossible de supprimer ce jeu car il possède des emprunts.") //Si la condition n'est pas vérifié (des emprunts sont liés au jeu) alors erreur HTTP code 400 Bad Request (pour éviter l'erreur serveur 500)
+            }
+        
+        try await game.delete(on: req.db)
+        
+        return .noContent // ici, on retourne un statut HTTP 204 No Content
     }
 }
