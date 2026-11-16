@@ -5,6 +5,7 @@ struct LoanController: RouteCollection {
     func boot(routes: any RoutesBuilder) throws {
         let loans = routes.grouped("loans")
         loans.post(use: create)
+        loans.post(":loanID", "return", use: returnLoan)
     }
 
     @Sendable
@@ -37,4 +38,27 @@ struct LoanController: RouteCollection {
         try await loan.save(on: req.db)
         return try await loan.toDTO().encodeResponse(status: .created, for: req)
     }
+    
+    @Sendable
+    // Enregistre le retour d'un jeu emprunté (POST /loans/:loanID/return)
+    func returnLoan(req: Request) async throws -> LoanDTO {
+        guard let loanID = req.parameters.get("loanID", as: UUID.self) else { // on récupère et on valide l'ID de l'emprunt depuis l'URL
+            throw Abort(.badRequest, reason: "Invalid loan id")
+        }
+    
+        guard let loan = try await Loan.find(loanID, on: req.db) else { // on cherche l'emprunt en base de données (404 s'il n'existe pas)
+            throw Abort(.notFound, reason: "Loan not found")
+        }
+        
+        guard loan.returnedAt == nil else { // on vérifie la règle métier : un emprunt déjà clôturé (returnedAt non nil) ne peut pas être rendu une seconde fois (409 Conflict)
+            throw Abort(.conflict, reason: "This loan has already been returned")
+        }
+        loan.returnedAt = Date()
+        
+        try await loan.save(on: req.db)
+        
+        return loan.toDTO()
+        
+    }
+        
 }
