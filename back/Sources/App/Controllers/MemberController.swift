@@ -7,6 +7,7 @@ struct MemberController: RouteCollection {
         members.get(use: index)
         members.post(use: create)
         members.get(":memberID", use: show)
+        members.get(":memberID", "loans", use: getLoans) //Pour la phase 3 (FEAT-04), déclaration de la route GET /members/:memberID/loans
         members.put(":memberID", use: update) //Pour la phase 3 (FEAT-02), déclaration de la route pour le PUT (modifier)
         members.delete(":memberID", use: delete) //Pour la phase 3 (FEAT-02), décalration de la route pour le DELETE (supprimer)
     }
@@ -37,6 +38,14 @@ struct MemberController: RouteCollection {
     func show(req: Request) async throws -> MemberDTO {
         let member = try await findMember(req)
         return member.toDTO()
+    }
+    
+    // on récupère la liste des emprunts (en cours ou rendus) d'un adhérent (GET /members/:memberID/loans)
+    @Sendable
+    func getLoans(req: Request) async throws -> [LoanDTO] {
+        let member = try await findMember(req) // onn retrouve l'adhérent (404 s'il n'existe pas) avec ses emprunts déjà chargés via .with(\.$loans)
+            
+        return member.loans.map { $0.toDTO() } // on va convertir chaque emprunt en LoanDTO (renvoie un tableau vide [] si aucun emprunt)
     }
     
     private func findMember(_ req: Request) async throws -> Member { // Fonction ajouter pour la phase 3 (FEAT-02) afin d'allèger la fonction show
