@@ -34,10 +34,24 @@ struct GameController: RouteCollection {
             }
             query = query.filter(\.$durationMinutes <= maxDuration)
         }
+        // Pour la phase 3 (FEAT-07) : Validation du filtre optionnel de disponibilité (?available=true ou false)
+        var availableFilter: Bool? = nil
+        if let availableRaw = req.query[String.self, at: "available"] {
+            guard let valueBool = Bool(availableRaw) else {
+                throw Abort(.badRequest, reason: "available must be 'true' or 'false'")
+            }
+            availableFilter = valueBool
+        }
         
         let games = try await query.all()
         
-        return games.map { $0.toDTO() }
+        var results = games.map { $0.toDTO() }
+
+        if let availableFilter {
+            results = results.filter { $0.isAvailable == availableFilter }
+        }
+
+        return results
     }
 
     @Sendable
