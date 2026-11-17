@@ -12,10 +12,31 @@ struct GameController: RouteCollection {
     }
 
     @Sendable
-    func index(req: Request) async throws -> [GameDTO] {
-        let games = try await Game.query(on: req.db)
-            .with(\.$loans)
-            .all()
+    func index(req: Request) async throws -> [GameDTO] { // Phase 3 (FEAT-06) : Récupère la liste des jeux avec filtres combinables et facultatifs (?q=...&players=...&maxDuration=...)
+        
+        var query = Game.query(on: req.db).with(\.$loans)
+        
+        // On filtre par titre (q) : recherche partielle insensible à la casse si le paramètre n'est pas vide
+        if let q = req.query[String.self, at: "q"], !q.trimmingCharacters(in: .whitespaces).isEmpty {
+            query = query.filter(\.$title, .custom("LIKE"), "%\(q)%")
+        }
+        if let playersRaw = req.query[String.self, at: "players"] { // Filtre par nombre de joueurs (players) : doit être un entier strictement positif (> 0)
+            guard let players = Int(playersRaw), players > 0 else {
+                throw Abort(.badRequest, reason: "players must be a positive integer")
+            }
+            query = query
+                .filter(\.$minPlayers <= players)
+                .filter(\.$maxPlayers >= players)
+        }
+        if let maxDurationRaw = req.query[String.self, at: "maxDuration"] { // Filtre par durée maximale en minutes (maxDuration) : doit être un entier strictement positif (> 0)
+            guard let maxDuration = Int(maxDurationRaw), maxDuration > 0 else {
+                throw Abort(.badRequest, reason: "maxDuration must be a positive integer")
+            }
+            query = query.filter(\.$durationMinutes <= maxDuration)
+        }
+        
+        let games = try await query.all()
+        
         return games.map { $0.toDTO() }
     }
 
