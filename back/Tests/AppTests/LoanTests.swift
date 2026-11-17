@@ -94,4 +94,55 @@ final class LoanTests: XCTestCase {
             }
         }
     }
+    
+    func testOverdueLoansReturnsOnlyUnreturnedPastDueLoans() async throws { // Phase 3 : Test créé pour tester à 100% la FEAT-05
+            try await withApp { app in
+                // 1. Création d'un adhérent et de 3 jeux via les helpers existants
+                let member = try await createMember(app)
+                let game1 = try await createGame(app, title: "Jeu en retard")
+                let game2 = try await createGame(app, title: "Jeu rendu en retard")
+                let game3 = try await createGame(app, title: "Jeu dans les temps")
+
+                let memberID = try XCTUnwrap(member.id)
+                let yesterday = Date().addingTimeInterval(-86_400) // Il y a 24h
+                let tomorrow = Date().addingTimeInterval(86_400)   // Dans 24h
+                let lastWeek = Date().addingTimeInterval(-7 * 86_400)
+
+                // Cas 1 : Emprunt non rendu et date limite dépassée -> DOIT être renvoyé
+                let overdueLoan = Loan(
+                    gameID: try XCTUnwrap(game1.id),
+                    memberID: memberID,
+                    borrowedAt: lastWeek,
+                    dueAt: yesterday
+                )
+                try await overdueLoan.save(on: app.db)
+
+                // Cas 2 : Emprunt dont la date limite est dépassée MAIS déjà rendu -> NE DOIT PAS être renvoyé
+                let returnedLateLoan = Loan(
+                    gameID: try XCTUnwrap(game2.id),
+                    memberID: memberID,
+                    borrowedAt: lastWeek,
+                    dueAt: yesterday
+                )
+                returnedLateLoan.returnedAt = Date()
+                try await returnedLateLoan.save(on: app.db)
+
+                // Cas 3 : Emprunt non rendu mais date limite dans le futur -> NE DOIT PAS être renvoyé
+                let activeLoan = Loan(
+                    gameID: try XCTUnwrap(game3.id),
+                    memberID: memberID,
+                    borrowedAt: Date(),
+                    dueAt: tomorrow
+                )
+                try await activeLoan.save(on: app.db)
+
+                // 2. Appel de la route GET /loans/overdue et vérifications
+                try await app.test(.GET, "loans/overdue", afterResponse: { res async throws in
+                    XCTAssertEqual(res.status, .ok)
+                    let results = try res.content.decode([LoanDTO].self)
+                    XCTAssertEqual(results.count, 1)
+                    XCTAssertEqual(results.first?.id, overdueLoan.id)
+                })
+            }
+        }
 }
