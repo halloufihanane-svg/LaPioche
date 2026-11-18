@@ -80,6 +80,18 @@
       </div>
     </form>
   </dialog>
+  <!-- Boîte de confirmation avant suppression (FEAT-01) -->
+  <dialog id="confirm-dialog">
+    <form method="dialog" id="confirm-form">
+      <h2 id="confirm-title">Confirmer la suppression</h2>
+      <p id="confirm-message"></p>
+      <p class="form-error" role="alert" hidden></p>
+      <div class="actions">
+        <button type="button" data-cancel>Annuler</button>
+        <button type="submit" class="danger">Supprimer</button>
+      </div>
+    </form>
+  </dialog>
 
   <div id="toasts" role="status" aria-live="polite"></div>
 

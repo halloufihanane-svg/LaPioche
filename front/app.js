@@ -66,6 +66,21 @@ function bindSubmit(dialog, form, handler) {
     }
   });
 }
+// Ouvre la boîte de confirmation avant une suppression (FEAT-01).
+const confirmDialog = $("#confirm-dialog");
+const confirmForm = $("#confirm-form");
+let confirmHandler = null;
+
+function askConfirm(message, handler) {
+  $("#confirm-message").textContent = message;
+  showFormError(confirmDialog, null);
+  confirmHandler = handler;
+  confirmDialog.showModal();
+}
+
+bindSubmit(confirmDialog, confirmForm, async () => {
+  if (confirmHandler) await confirmHandler();
+});
 
 // --- Onglets ---------------------------------------------------------------
 
@@ -101,11 +116,19 @@ function gameCard(game) {
   const status = game.isAvailable
     ? el("span", { class: "badge ok" }, "Disponible")
     : el("span", { class: "badge busy" }, "Emprunté");
-
+  
+  // Boutons d'action de la carte : emprunter (si disponible), modifier ou supprimer (FEAT-01)
   const actions = el("div", { class: "actions" });
   if (game.isAvailable) {
     actions.append(button("Emprunter", () => openBorrowDialog(game), "primary"));
   }
+  actions.append(
+    button("Modifier", () => openEditGameDialog(game)),
+    button("Supprimer", () => askConfirm(
+      `Supprimer définitivement le jeu « ${game.title} » ?`,
+      () => api.deleteGame(game.id),
+    ), "danger"),
+  );
 
   return el(
     "li",
@@ -115,24 +138,41 @@ function gameCard(game) {
     actions,
   );
 }
-
+// Modale unique pour créer un jeu (POST) ou modifier un jeu existant (PUT) (FEAT-01)
 const gameDialog = $("#game-dialog");
 const gameForm = $("#game-form");
+let editingGame = null;
+
+function openEditGameDialog(game) {
+  editingGame = game;
+  $("h2", gameDialog).textContent = "Modifier un jeu";
+  gameForm.elements.title.value = game.title;
+  gameForm.elements.minPlayers.value = game.minPlayers;
+  gameForm.elements.maxPlayers.value = game.maxPlayers;
+  gameForm.elements.durationMinutes.value = game.durationMinutes;
+  showFormError(gameDialog, null);
+  gameDialog.showModal();
+}
 
 $("#add-game").addEventListener("click", () => {
+  editingGame = null;
+  $("h2", gameDialog).textContent = "Ajouter un jeu";
   gameForm.reset();
   showFormError(gameDialog, null);
   gameDialog.showModal();
 });
 
-bindSubmit(gameDialog, gameForm, (data) =>
-  api.createGame({
+bindSubmit(gameDialog, gameForm, (data) => {
+  const payload = {
     title: data.get("title").trim(),
     minPlayers: Number(data.get("minPlayers")),
     maxPlayers: Number(data.get("maxPlayers")),
     durationMinutes: Number(data.get("durationMinutes")),
-  }),
-);
+  };
+  return editingGame
+    ? api.updateGame(editingGame.id, payload)
+    : api.createGame(payload);
+});
 
 // --- Emprunts --------------------------------------------------------------
 
