@@ -125,6 +125,8 @@ function getGameSearchFilters(form) {
   if (q) filters.q = q;
   if (players !== null) filters.players = players;
   if (maxDuration !== null) filters.maxDuration = maxDuration;
+  const availableOnly = Boolean(form.querySelector('input[name="availableOnly"]')?.checked); // Inclut le filtre "disponibles uniquement" uniquement lorsqu'il est coché (FEAT-07)
+  if (availableOnly) filters.available = true;
   return filters;
 }
 async function loadGames() {
@@ -147,6 +149,14 @@ if (gamesSearchForm) {
     gameFilters = {};
     await run(loadGames);
   });
+  // Recharge la liste dès que l'utilisateur coche ou décoche "Disponibles uniquement" (FEAT-07)
+  const availableCheckbox = gamesSearchForm.querySelector('input[name="availableOnly"]');
+  if (availableCheckbox) {
+    availableCheckbox.addEventListener("change", async () => {
+      gameFilters = getGameSearchFilters(gamesSearchForm);
+      await run(loadGames);
+    });
+  }
 }
 
 function gameCard(game) {

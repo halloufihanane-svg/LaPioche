@@ -113,6 +113,7 @@ export const api = {
     if (filters.q) params.set("q", filters.q);
     if (filters.players) params.set("players", String(filters.players));
     if (filters.maxDuration) params.set("maxDuration", String(filters.maxDuration));
+    if (typeof filters.available === "boolean") params.set("available", String(filters.available)); // Ajoute available uniquement s'il est booléen pour filtrer les jeux disponibles ou empruntés (FEAT-07)
     const query = params.toString();
     return request("GET", query ? `/games?${query}` : "/games");
   },

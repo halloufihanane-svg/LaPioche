@@ -339,3 +339,33 @@ test("searching games with no match shows a message distinct from an empty libra
   assertIncludes(app.$("#games-no-match").textContent, "Aucun jeu ne correspond");
   assertTrue(app.$("#games-empty").hidden, "le message de ludothèque vide ne doit pas s'afficher");
 });
+
+// Vérifie que cocher "Disponibles uniquement" déclenche bien l'appel avec available=true (FEAT-07)
+test("toggling available only updates the list and sends available=true", async () => {
+  const app = await mountApp({
+    "GET /games": [catan],
+    "GET /games?available=true": [catan],
+  });
+  await waitFor(() => app.$$("#games-list .card").length === 1);
+  const checkbox = app.$('#games-search-form input[name="availableOnly"]');
+  checkbox.click();
+  await waitFor(() => JSON.stringify(app.calls).includes("available=true"));
+});
+
+test("available only combines with search query parameters", async () => {
+  const app = await mountApp({
+    "GET /games": [catan],
+    "GET /games?q=cat&available=true": [catan],
+    "GET /games?available=true&q=cat": [catan],
+  });
+  await waitFor(() => app.$$("#games-list .card").length === 1);
+  app.$('#games-search-form input[name="q"]').value = "cat";
+  const checkbox = app.$('#games-search-form input[name="availableOnly"]');
+  checkbox.checked = true;
+  checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+  app.$('#games-search-form button[type="submit"]').click();
+  await waitFor(() => {
+    const req = JSON.stringify(app.calls);
+    return req.includes("q=cat") && req.includes("available=true");
+  });
+});
