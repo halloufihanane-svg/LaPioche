@@ -64,6 +64,39 @@ test("a validation error is shown in French and the dialog stays open", async ()
   assertEqual(app.$("#game-dialog .form-error").textContent, "Le titre est obligatoire. La durée doit être d'au moins 1.");
   assertTrue(app.$("#game-dialog").open, "la boîte devrait rester ouverte");
 });
+test("editing a game updates it and closes the dialog", async () => {
+  const app = await mountApp({
+    "GET /games": [catan],
+    "PUT /games/g1": [200, { ...catan, title: "Catan Deluxe" }],
+  });
+  await waitFor(() => app.$$("#games-list .card").length === 1);
+  app.click("Modifier", cardOf(app, "Catan"));
+  const form = app.$("#game-form");
+  assertEqual(form.elements.title.value, "Catan");
+  form.elements.title.value = "Catan Deluxe";
+  form.requestSubmit();
+  await waitFor(() => app.calls.some((call) => call.method === "PUT" && call.path === "/games/g1"), "l'appel PUT /games/g1");
+  assertEqual(app.calls.find((call) => call.method === "PUT").body, {
+    title: "Catan Deluxe",
+    minPlayers: 3,
+    maxPlayers: 4,
+    durationMinutes: 90,
+  });
+  await waitFor(() => !app.$("#game-dialog").open, "la boîte se ferme");
+});
+
+test("a delete refusal from the API is shown in French and keeps the dialog open", async () => {
+  const app = await mountApp({
+    "GET /games": [dixit],
+    "DELETE /games/g2": [409, { error: true, reason: "Cannot delete a game that has loans" }],
+  });
+  await waitFor(() => app.$$("#games-list .card").length === 1);
+  app.click("Supprimer", cardOf(app, "Dixit"));
+  await waitFor(() => app.$("#confirm-dialog").open, "la confirmation s'ouvre");
+  app.click("Supprimer", app.$("#confirm-dialog"));
+  await waitFor(() => !app.$("#confirm-dialog .form-error").hidden, "le message d'erreur");
+  assertTrue(app.$("#confirm-dialog").open, "la confirmation devrait rester ouverte");
+});
 
 // --- Emprunts
 
