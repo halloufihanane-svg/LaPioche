@@ -273,3 +273,38 @@ test("member loans dialog shows an empty message when the member has no loans", 
   await waitFor(() => app.$("#member-loans-dialog").open, "la boîte des emprunts s'ouvre");
   assertIncludes(app.$("#member-loans-content").textContent, "Aucun emprunt");
 });
+
+// Tests des emprunts en retard et de l'indicateur associé (FEAT-05)
+test("overdue tab shows late loans with game, member, due date and days late", async () => {
+  const twoDaysAgo = new Date(Date.now() - 2 * 86400_000).toISOString();
+  const app = await mountApp(
+    {
+      "GET /loans/overdue": [
+        { id: "l1", gameID: "g2", memberID: "m1", borrowedAt: "2026-10-20T10:00:00Z", dueAt: twoDaysAgo, returnedAt: null },
+      ],
+      "GET /games": [dixit],
+      "GET /members": [camille],
+    },
+    { hash: "#overdue" },
+  );
+  await waitFor(() => app.$$("#overdue-list .row").length === 1);
+  assertIncludes(app.$("#overdue-count").textContent, "1");
+  const text = app.$("#overdue-list").textContent;
+  assertIncludes(text, "Dixit");
+  assertIncludes(text, "Camille");
+  assertIncludes(text, "En retard");
+  assertIncludes(text, "j de retard");
+});
+
+test("overdue tab shows an explicit message when there are no overdue loans", async () => {
+  const app = await mountApp(
+    {
+      "GET /loans/overdue": [],
+      "GET /games": [],
+      "GET /members": [],
+    },
+    { hash: "#overdue" },
+  );
+  await waitFor(() => !app.$("#overdue-empty").hidden);
+  assertIncludes(app.$("#overdue-empty").textContent, "Aucun emprunt en retard");
+});

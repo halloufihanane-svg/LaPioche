@@ -123,4 +123,6 @@ export const api = {
   
   listMemberLoans: (memberID) => request("GET", `/members/${memberID}/loans`), // Phase 4 (FEAT-03) : routes pour retrouver l'emprunt en cours 
   returnLoan: (loanID) => request("POST", `/loans/${loanID}/return`), // Phase 4 (FEAT-03) : routes pour rendre un jeu
+
+  listOverdueLoans: () => request("GET", "/loans/overdue"), // Phase 4 (FEAT-05) : route pour lister les emprunts en retard
 };

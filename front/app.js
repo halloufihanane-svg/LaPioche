@@ -84,7 +84,7 @@ bindSubmit(confirmDialog, confirmForm, async () => {
 
 // --- Onglets ---------------------------------------------------------------
 
-const tabs = ["games", "members"];
+const tabs = ["games", "members", "overdue"];
 
 function currentTab() {
   const name = location.hash.slice(1);
@@ -97,7 +97,9 @@ async function refresh() {
     $(`#${name}`).hidden = name !== tab;
     $(`[data-tab="${name}"]`).toggleAttribute("aria-current", name === tab);
   }
-  await run(tab === "games" ? loadGames : loadMembers);
+  const loader = tab === "games" ? loadGames : tab === "members" ? loadMembers : loadOverdue;
+  await run(loader);
+  await run(refreshOverdueBadge); // Met à jour la pastille du nombre d'emprunts en retard visible sans ouvrir l'onglet (FEAT-05)
 }
 
 window.addEventListener("hashchange", refresh);
@@ -286,7 +288,7 @@ bindSubmit(memberDialog, memberForm, (data) => {
     : api.createMember(payload);
 });
 
-// Affiche la liste des emprunts d'un·e adhérent·e avec titre du jeu, dates et état (FEAT-04)
+// Affiche la liste des emprunts d'un adhérent avec titre du jeu, dates et état (FEAT-04)
 const memberLoansDialog = $("#member-loans-dialog");
 
 async function openMemberLoansDialog(member) {
@@ -335,5 +337,55 @@ async function openMemberLoansDialog(member) {
     memberLoansDialog.showModal();
   });
 }
+// Met à jour l'indicateur du nombre d'emprunts en retard dans la barre de navigation (FEAT-05)
+async function refreshOverdueBadge() {
+  const overdue = await api.listOverdueLoans();
+  const badge = $("#overdue-count");
+  if (!badge) return;
+  badge.textContent = String(overdue.length);
+  badge.hidden = overdue.length === 0;
+}
 
+// Affiche la liste des emprunts en retard avec jeu, adhérent, date limite et jours de retard (FEAT-05)
+async function loadOverdue() {
+  const [overdueLoans, games, members] = await Promise.all([
+    api.listOverdueLoans(),
+    api.listGames(),
+    api.listMembers(),
+  ]);
+  const gamesByID = new Map(games.map((g) => [g.id, g.title]));
+  const membersByID = new Map(members.map((m) => [m.id, m.name]));
+  const list = $("#overdue-list");
+  const empty = $("#overdue-empty");
+  list.replaceChildren();
+
+  if (overdueLoans.length === 0) {
+    empty.hidden = false;
+    return;
+  }
+  empty.hidden = true;
+  const now = Date.now();
+  for (const loan of overdueLoans) {
+    const gameTitle = gamesByID.get(loan.gameID) ?? "Jeu inconnu";
+    const memberName = membersByID.get(loan.memberID) ?? "Adhérent·e inconnu·e";
+    const daysLate = Math.max(1, Math.floor((now - new Date(loan.dueAt).getTime()) / 86400_000));
+    list.append(
+      el(
+        "li",
+        { class: "row" },
+        el(
+          "div",
+          { class: "row-main" },
+          el("p", {}, el("strong", {}, gameTitle)),
+          el(
+            "p",
+            { class: "meta" },
+            `Adhérent·e : ${memberName} · À rendre avant le ${formatDate(loan.dueAt)}`,
+          ),
+        ),
+        el("span", { class: "badge danger" }, `En retard · ${daysLate} j de retard`),
+      ),
+    );
+  }
+}
 refresh();
