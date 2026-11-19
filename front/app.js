@@ -117,10 +117,12 @@ function gameCard(game) {
     ? el("span", { class: "badge ok" }, "Disponible")
     : el("span", { class: "badge busy" }, "Emprunté");
   
-  // Boutons d'action de la carte : emprunter (si disponible), modifier ou supprimer (FEAT-01)
+  // Boutons d'action de la carte : emprunter ou rendre (FEAT-03), modifier ou supprimer (FEAT-01)
   const actions = el("div", { class: "actions" });
   if (game.isAvailable) {
     actions.append(button("Emprunter", () => openBorrowDialog(game), "primary"));
+  } else {
+    actions.append(button("Rendre", () => returnGame(game), "primary"));
   }
   actions.append(
     button("Modifier", () => openEditGameDialog(game)),
@@ -201,6 +203,25 @@ bindSubmit(borrowDialog, borrowForm, async (data) => {
   const loan = await api.borrow(borrowedGame.id, data.get("memberID"));
   toast(`« ${borrowedGame.title} » emprunté, à rendre avant le ${formatDate(loan.dueAt)}.`);
 });
+
+async function returnGame(game) { // Retrouve l'emprunt en cours d'un jeu parmi les adhérents et enregistre son retour (FEAT-03)
+  await run(async () => {
+    const members = await api.listMembers();
+    let activeLoan = null;
+    for (const member of members) {
+      const loans = await api.listMemberLoans(member.id);
+      activeLoan = loans.find((loan) => loan.gameID === game.id && !loan.returnedAt);
+      if (activeLoan) break;
+    }
+    if (!activeLoan) {
+      toast("Aucun emprunt en cours trouvé pour ce jeu.", true);
+      return;
+    }
+    await api.returnLoan(activeLoan.id);
+    toast(`« ${game.title} » a été rendu.`);
+    await refresh();
+  });
+}
 
 // --- Adhérent·es -----------------------------------------------------------
 
