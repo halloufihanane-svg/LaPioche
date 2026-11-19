@@ -210,25 +210,58 @@ async function loadMembers() {
   $("#members-list").replaceChildren(...members.map(memberRow));
 }
 
+let editingMember = null;
+
+function openMemberDialog(member = null) {
+  editingMember = member;
+  memberForm.reset();
+  showFormError(memberDialog, null);
+  $("h2", memberDialog).textContent = member
+    ? "Modifier l'adhérent·e"
+    : "Ajouter un·e adhérent·e";
+  if (member) {
+    memberForm.elements.name.value = member.name;
+    memberForm.elements.email.value = member.email;
+  }
+  memberDialog.showModal();
+}
+
 function memberRow(member) {
+  const actions = el(
+    "div",
+    { class: "actions" },
+    button("Modifier", () => openMemberDialog(member)),
+    button(
+      "Supprimer",
+      () =>
+        askConfirm(
+          `Supprimer définitivement « ${member.name} » (${member.email}) ?`,
+          () => api.deleteMember(member.id),
+        ),
+      "danger",
+    ),
+  );
   return el(
     "li",
     { class: "row" },
     el("div", { class: "row-main" }, el("p", {}, el("strong", {}, member.name)), el("p", { class: "meta" }, member.email)),
+    actions,
   );
 }
 
 const memberDialog = $("#member-dialog");
 const memberForm = $("#member-form");
 
-$("#add-member").addEventListener("click", () => {
-  memberForm.reset();
-  showFormError(memberDialog, null);
-  memberDialog.showModal();
-});
+$("#add-member").addEventListener("click", () => openMemberDialog());
 
-bindSubmit(memberDialog, memberForm, (data) =>
-  api.createMember({ name: data.get("name").trim(), email: data.get("email").trim() }),
-);
+bindSubmit(memberDialog, memberForm, (data) => {
+  const payload = {
+    name: data.get("name").trim(),
+    email: data.get("email").trim(),
+  };
+  return editingMember
+    ? api.updateMember(editingMember.id, payload)
+    : api.createMember(payload);
+});
 
 refresh();

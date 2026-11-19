@@ -116,5 +116,8 @@ export const api = {
   listMembers: () => request("GET", "/members"),
   createMember: (member) => request("POST", "/members", member),
 
+  updateMember: (id, member) => request("PUT", `/members/${id}`, member), //Phase 4 (FEAT-2) : route pour modifier un adérent
+  deleteMember: (id) => request("DELETE", `/members/${id}`), //Phase 4 (FEAT-2) : route pour supprimer un adérent
+
   borrow: (gameID, memberID) => request("POST", "/loans", { gameID, memberID }),
 };

@@ -161,3 +161,43 @@ test("an email already in use is shown in French", async () => {
   await waitFor(() => !app.$("#member-dialog .form-error").hidden, "le message d'erreur");
   assertIncludes(app.$("#member-dialog .form-error").textContent, "utilise déjà cette adresse e-mail");
 });
+
+test("editing a member updates it and closes the dialog", async () => {
+  const app = await mountApp(
+    {
+      "GET /members": [camille],
+      "PUT /members/m1": [200, { ...camille, name: "Camille Martin" }],
+    },
+    { hash: "#members" },
+  );
+  await waitFor(() => app.$$("#members-list .row").length === 1);
+  app.click("Modifier", app.$("#members-list .row"));
+  const form = app.$("#member-form");
+  assertEqual(form.elements.name.value, "Camille");
+  form.elements.name.value = "Camille Martin";
+  form.requestSubmit();
+  await waitFor(() => app.calls.some((call) => call.method === "PUT" && call.path === "/members/m1"), "l'appel PUT /members/m1");
+  assertEqual(app.calls.find((call) => call.method === "PUT").body, {
+    name: "Camille Martin",
+    email: "camille@example.com",
+  });
+  await waitFor(() => !app.$("#member-dialog").open, "la boîte se ferme");
+});
+
+test("editing a member with an email already in use shows a French error", async () => {
+  const app = await mountApp(
+    {
+      "GET /members": [camille],
+      "PUT /members/m1": [409, { error: true, reason: "A member with this email already exists" }],
+    },
+    { hash: "#members" },
+  );
+  await waitFor(() => app.$$("#members-list .row").length === 1);
+  app.click("Modifier", app.$("#members-list .row"));
+  const form = app.$("#member-form");
+  form.elements.email.value = "autre@example.com";
+  form.requestSubmit();
+  await waitFor(() => !app.$("#member-dialog .form-error").hidden, "le message d'erreur");
+  assertIncludes(app.$("#member-dialog .form-error").textContent, "utilise déjà cette adresse e-mail");
+  assertTrue(app.$("#member-dialog").open, "la boîte devrait rester ouverte");
+});
