@@ -251,6 +251,7 @@ function memberRow(member) {
   const actions = el(
     "div",
     { class: "actions" },
+    button("Emprunts", () => openMemberLoansDialog(member)),
     button("Modifier", () => openMemberDialog(member)),
     button(
       "Supprimer",
@@ -284,5 +285,55 @@ bindSubmit(memberDialog, memberForm, (data) => {
     ? api.updateMember(editingMember.id, payload)
     : api.createMember(payload);
 });
+
+// Affiche la liste des emprunts d'un·e adhérent·e avec titre du jeu, dates et état (FEAT-04)
+const memberLoansDialog = $("#member-loans-dialog");
+
+async function openMemberLoansDialog(member) {
+  await run(async () => {
+    const [loans, games] = await Promise.all([
+      api.listMemberLoans(member.id),
+      api.listGames(),
+    ]);
+    const gamesByID = new Map(games.map((g) => [g.id, g.title]));
+    $("#member-loans-title").textContent = `Emprunts de ${member.name}`;
+    const container = $("#member-loans-content");
+    container.replaceChildren();
+
+    if (loans.length === 0) {
+      container.append(el("p", { class: "empty" }, "Aucun emprunt pour le moment."));
+    } else {
+      const now = Date.now();
+      const list = el("ul", { class: "list" });
+      for (const loan of loans) {
+        const title = gamesByID.get(loan.gameID) ?? "Jeu inconnu";
+        let statusLabel = "En cours";
+        let badgeClass = "badge busy";
+        if (loan.returnedAt) {
+          statusLabel = "Rendu";
+          badgeClass = "badge ok";
+        } else if (new Date(loan.dueAt).getTime() < now) {
+          statusLabel = "En retard";
+          badgeClass = "badge danger";
+        }
+        list.append(
+          el(
+            "li",
+            { class: "row" },
+            el(
+              "div",
+              {},
+              el("strong", {}, title),
+              el("div", { class: "meta" }, `Emprunté le ${formatDate(loan.borrowedAt)} · À rendre avant le ${formatDate(loan.dueAt)}`),
+            ),
+            el("span", { class: badgeClass }, statusLabel),
+          ),
+        );
+      }
+      container.append(list);
+    }
+    memberLoansDialog.showModal();
+  });
+}
 
 refresh();

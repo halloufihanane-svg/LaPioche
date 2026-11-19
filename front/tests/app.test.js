@@ -226,3 +226,50 @@ test("editing a member with an email already in use shows a French error", async
   assertIncludes(app.$("#member-dialog .form-error").textContent, "utilise déjà cette adresse e-mail");
   assertTrue(app.$("#member-dialog").open, "la boîte devrait rester ouverte");
 });
+
+// Phase 4 (FEAT-04) : Tests de consultation des emprunts d'un adhérent 
+test("member loans dialog shows game titles and the three loan states", async () => {
+  const pastDue = new Date(Date.now() - 3 * 86400_000).toISOString();
+  const futureDue = new Date(Date.now() + 7 * 86400_000).toISOString();
+  const app = await mountApp(
+    {
+      "GET /members": [camille],
+      "GET /games": [
+        catan,
+        dixit,
+        { id: "g3", title: "Azul", minPlayers: 2, maxPlayers: 4, durationMinutes: 45, isAvailable: false },
+      ],
+      "GET /members/m1/loans": [
+        { id: "l1", gameID: "g1", memberID: "m1", borrowedAt: "2026-10-01T10:00:00Z", dueAt: "2026-10-15T10:00:00Z", returnedAt: "2026-10-10T10:00:00Z" },
+        { id: "l2", gameID: "g2", memberID: "m1", borrowedAt: "2026-11-15T10:00:00Z", dueAt: futureDue, returnedAt: null },
+        { id: "l3", gameID: "g3", memberID: "m1", borrowedAt: "2026-11-01T10:00:00Z", dueAt: pastDue, returnedAt: null },
+      ],
+    },
+    { hash: "#members" },
+  );
+  await waitFor(() => app.$$("#members-list .row").length === 1);
+  app.click("Emprunts", app.$("#members-list .row"));
+  await waitFor(() => app.$("#member-loans-dialog").open, "la boîte des emprunts s'ouvre");
+  const content = app.$("#member-loans-content").textContent;
+  assertIncludes(content, "Catan");
+  assertIncludes(content, "Rendu");
+  assertIncludes(content, "Dixit");
+  assertIncludes(content, "En cours");
+  assertIncludes(content, "Azul");
+  assertIncludes(content, "En retard");
+});
+
+test("member loans dialog shows an empty message when the member has no loans", async () => {
+  const app = await mountApp(
+    {
+      "GET /members": [camille],
+      "GET /games": [catan],
+      "GET /members/m1/loans": [],
+    },
+    { hash: "#members" },
+  );
+  await waitFor(() => app.$$("#members-list .row").length === 1);
+  app.click("Emprunts", app.$("#members-list .row"));
+  await waitFor(() => app.$("#member-loans-dialog").open, "la boîte des emprunts s'ouvre");
+  assertIncludes(app.$("#member-loans-content").textContent, "Aucun emprunt");
+});
