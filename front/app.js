@@ -106,10 +106,47 @@ window.addEventListener("hashchange", refresh);
 
 // --- Jeux ------------------------------------------------------------------
 
+// État des filtres actifs pour la recherche de jeux (FEAT-06)
+let gameFilters = {};
+
+function readPositiveInt(raw) {
+  if (raw === null || raw === undefined) return null;
+  const trimmed = String(raw).trim();
+  if (!/^[1-9]\d*$/.test(trimmed)) return null;
+  return Number(trimmed);
+}
+
+function getGameSearchFilters(form) {
+  const data = new FormData(form);
+  const filters = {};
+  const q = String(data.get("q") ?? "").trim();
+  const players = readPositiveInt(data.get("players"));
+  const maxDuration = readPositiveInt(data.get("maxDuration"));
+  if (q) filters.q = q;
+  if (players !== null) filters.players = players;
+  if (maxDuration !== null) filters.maxDuration = maxDuration;
+  return filters;
+}
 async function loadGames() {
-  const games = await api.listGames();
-  $("#games-empty").hidden = games.length > 0;
+  const hasActiveSearch = Object.keys(gameFilters).length > 0;
+  const games = await api.listGames(gameFilters);
+  $("#games-empty").hidden = hasActiveSearch || games.length > 0;
+  $("#games-no-match").hidden = !hasActiveSearch || games.length > 0;
   $("#games-list").replaceChildren(...games.map(gameCard));
+}
+
+const gamesSearchForm = $("#games-search-form");
+if (gamesSearchForm) {
+  gamesSearchForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    gameFilters = getGameSearchFilters(gamesSearchForm);
+    await run(loadGames);
+  });
+  $("#games-reset").addEventListener("click", async () => {
+    gamesSearchForm.reset();
+    gameFilters = {};
+    await run(loadGames);
+  });
 }
 
 function gameCard(game) {

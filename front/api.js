@@ -107,7 +107,15 @@ async function request(method, path, body) {
 }
 
 export const api = {
-  listGames: () => request("GET", "/games"),
+  // Phase 4 (FEAT-06) : recherche combinée de jeux via query parameters optionnels
+  listGames: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.q) params.set("q", filters.q);
+    if (filters.players) params.set("players", String(filters.players));
+    if (filters.maxDuration) params.set("maxDuration", String(filters.maxDuration));
+    const query = params.toString();
+    return request("GET", query ? `/games?${query}` : "/games");
+  },
   createGame: (game) => request("POST", "/games", game),
 
   updateGame: (id, game) => request("PUT", `/games/${id}`, game), //Phase 4 (FEAT-1) : route pour modifier un jeu

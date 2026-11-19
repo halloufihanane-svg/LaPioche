@@ -308,3 +308,34 @@ test("overdue tab shows an explicit message when there are no overdue loans", as
   await waitFor(() => !app.$("#overdue-empty").hidden);
   assertIncludes(app.$("#overdue-empty").textContent, "Aucun emprunt en retard");
 });
+
+// Tests de recherche de jeux et de résultat vide (FEAT-06)
+test("searching games sends valid query parameters and ignores invalid ones", async () => {
+  const app = await mountApp({
+    "GET /games": [catan],
+    "GET /games?q=cat&players=4": [catan],
+    "GET /games?players=4&q=cat": [catan],
+  });
+  await waitFor(() => app.$$("#games-list .card").length === 1);
+  app.$('#games-search-form input[name="q"]').value = "cat";
+  app.$('#games-search-form input[name="players"]').value = "4";
+  app.$('#games-search-form input[name="maxDuration"]').value = "-5";
+  app.$('#games-search-form button[type="submit"]').click();
+  await waitFor(() => {
+    const req = JSON.stringify(app.calls);
+    return req.includes("q=cat") && req.includes("players=4") && !req.includes("maxDuration");
+  });
+});
+
+test("searching games with no match shows a message distinct from an empty library", async () => {
+  const app = await mountApp({
+    "GET /games": [catan],
+    "GET /games?q=inexistant": [],
+  });
+  await waitFor(() => app.$$("#games-list .card").length === 1);
+  app.$('#games-search-form input[name="q"]').value = "inexistant";
+  app.$('#games-search-form button[type="submit"]').click();
+  await waitFor(() => !app.$("#games-no-match").hidden);
+  assertIncludes(app.$("#games-no-match").textContent, "Aucun jeu ne correspond");
+  assertTrue(app.$("#games-empty").hidden, "le message de ludothèque vide ne doit pas s'afficher");
+});
